@@ -26,17 +26,19 @@
       //
       // ─── START SCENE ───────────────────────────────────────────────────────────────
       //
-      const StartScene = {
-        key: "StartScene",
+      class StartScene extends Phaser.Scene {
+        constructor() {
+          super("StartScene");
+        }
 
-        preload: function () {
+        preload() {
           this.load.image(
             "startBackground",
             "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Hap%20%2B%20Mello-NJA6WZDXuL6SQq8fDa18MCAc9MAPHK.png?J8RQ",
           );
-        },
+        }
 
-        create: function () {
+        create() {
           const { width, height } = this.sys.game.config;
 
           // Scale start‐screen background to cover 540×960
@@ -79,18 +81,20 @@
             window.FarcadeSDK.singlePlayer.actions.ready();
             this.scene.start("MainScene");
           });
-        },
-      };
+        }
+      }
 
       //
       // ─── MAIN SCENE ────────────────────────────────────────────────────────────────
       //
-      const MainScene = {
-        key: "MainScene",
-        gameOverActive: false,
-        gridSize: 50, // Grid size for movement
+      class MainScene extends Phaser.Scene {
+        constructor() {
+          super("MainScene");
+          this.gameOverActive = false;
+          this.gridSize = 50; // Grid size for movement
+        }
 
-        preload: function () {
+        preload() {
           this.load.image(
             "background",
             "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Doodles_background_01%202-KLVWpf6ap0hDJttNF1nIPUTWX7N22c.jpg?rSuy",
@@ -111,9 +115,9 @@
             "bomb",
             "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Poop-GcrWW9Qz2nMwNVjxRnuaNqFHV1j6HE.png?OsR3",
           );
-        },
+        }
 
-        create: function () {
+        create() {
           const { width, height } = this.sys.game.config;
           this.gameOverActive = false;
           this.robotDisplaySize = 80;
@@ -182,9 +186,9 @@
 
           // 8) ITEM DROPPING TIMER (triggered per turn)
           this._dropOnce(); // Initial drop - ensure it's called correctly
-        },
+        }
 
-        update: function () {
+        update() {
           if (this.gameOverActive) return;
 
           // Turn-based movement: Only move on key press
@@ -203,18 +207,18 @@
             this.sys.game.config.width - this.player.displayWidth / 2,
           );
           this.player.y = this.playerY; // Keep Y fixed
-        },
+        }
 
-        endPlayerTurn: function () {
+        endPlayerTurn() {
           // After player moves, update robot and drop items
           this.robot.x += 50; // Simple robot movement
           if (this.robot.x >= this.sys.game.config.width - this.robot.displayWidth / 2) {
             this.robot.x = this.robot.displayWidth / 2; // Reset position
           }
           this._dropOnce(); // Drop new item or bomb
-        },
+        }
 
-        _dropOnce: function () {
+        _dropOnce() {
           const isBomb = Phaser.Math.Between(1, 10) === 1; // 10% chance
           const key = isBomb ? "bomb" : "item";
           const sprite = this.physics.add
@@ -229,23 +233,23 @@
             sprite.setTint(0x00ff00);
           }
           sprite.setVelocityY(200); // Still falls, but game is turn-based
-        },
+        }
 
-        collectItem: function (player, item) {
+        collectItem(player, item) {
           item.destroy();
           this.score += 10;
           this.scoreText.setText(`Score: ${this.score}`);
           window.FarcadeSDK.singlePlayer.actions.hapticFeedback();
-        },
+        }
 
-        hitBomb: function (player, bomb) {
+        hitBomb(player, bomb) {
           bomb.destroy();
           window.FarcadeSDK.singlePlayer.actions.hapticFeedback();
           window.FarcadeSDK.singlePlayer.actions.gameOver({ score: this.score });
           this.gameOverActive = true;
           this.physics.pause();
-        },
-      };
+        }
+      }
 
       //
       // ─── GAME CONFIGURATION ─────────────────────────────────────────────────────
