@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Item Collection Game (Roguelike)</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@farcade/game-sdk@latest/dist/index.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        user-select: none;
+      }
+      #game-container {
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <script>
+      //
+      // ─── START SCENE ───────────────────────────────────────────────────────────────
+      //
+      class StartScene extends Phaser.Scene {
+        constructor() {
+          super("StartScene");
+        }
+
+        preload() {
+          this.load.image(
+            "startBackground",
+            "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Hap%20%2B%20Mello-NJA6WZDXuL6SQq8fDa18MCAc9MAPHK.png?J8RQ",
+          );
+        }
+
+        create() {
+          const { width, height } = this.sys.game.config;
+
+          // Scale start‐screen background to cover 540×960
+          this.startBackground = this.add.image(0, 0, "startBackground").setOrigin(0, 0);
+          const bgTexture = this.textures.get("startBackground").getSourceImage();
+          const bgW = bgTexture.width;
+          const bgH = bgTexture.height;
+          const scaleX = width / bgW;
+          const scaleY = height / bgH;
+          const bgScale = Math.max(scaleX, scaleY);
+          this.startBackground.setScale(bgScale);
+          const newBgW = bgW * bgScale;
+          const newBgH = bgH * bgScale;
+          if (newBgW > width) this.startBackground.x = -(newBgW - width) / 2;
+          if (newBgH > height) this.startBackground.y = -(newBgH - height) / 2;
+
+          // “Let’s Collect!” button
+          const buttonText = this.add
+            .text(width / 2, height / 2, "Let's Collect!", {
+              fontSize: "32px",
+              fill: "#000000",
+              fontFamily: "Arial, sans-serif",
+            })
+            .setOrigin(0.5);
+
+          const paddingX = 20;
+          const paddingY = 10;
+          const boxWidth = buttonText.width + paddingX * 2;
+          const boxHeight = buttonText.height + paddingY * 2;
+
+          const box = this.add
+            .rectangle(width / 2, height / 2, boxWidth, boxHeight, 0xffffff, 0.7)
+            .setOrigin(0.5)
+            .setStrokeStyle(4, 0x000000);
+
+          buttonText.setDepth(1);
+
+          // On click, signal ready and start MainScene immediately
+          box.setInteractive({ useHandCursor: true }).on("pointerdown", () => {
+            window.FarcadeSDK.singlePlayer.actions.ready();
+            this.scene.start("MainScene");
+          });
+        }
+      }
+
+      //
+      // ─── MAIN SCENE ────────────────────────────────────────────────────────────────
+      //
+      class MainScene extends Phaser.Scene {
+        constructor() {
+          super("MainScene");
+          this.gameOverActive = false;
+          this.gridSize = 50; // Grid size for movement
+        }
+
+        preload() {
+          this.load.image(
+            "background",
+            "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Doodles_background_01%202-KLVWpf6ap0hDJttNF1nIPUTWX7N22c.jpg?rSuy",
+          );
+          this.load.image(
+            "robot",
+            "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/doopie%2002-x7l7FKNfLck4bOxxKBLvlsUDJB93wx.png?ASMK",
+          );
+          this.load.image(
+            "player",
+            "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Balloon-6mpEog4AhZ93hH4qSSOAKtlA3uGDCl.png?ZyUj",
+          );
+          this.load.image(
+            "item",
+            "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Pigeon-R2I3J6eispkHZdKT3mI9gKpxP9esN0.png?lXdE",
+          );
+          this.load.image(
+            "bomb",
+            "https://lqy3lriiybxcejon.public.blob.vercel-storage.com/5b277a7b-a5d6-46ac-a1ec-883587d5e190/Poop-GcrWW9Qz2nMwNVjxRnuaNqFHV1j6HE.png?OsR3",
+          );
+        }
+
+        create() {
+          const { width, height } = this.sys.game.config;
+          this.gameOverActive = false;
+          this.robotDisplaySize = 80;
+
+          // 1) BACKGROUND (scaled to cover 540×960)
+          this.background = this.add.image(0, 0, "background").setOrigin(0, 0);
+          const bgTexture = this.textures.get("background").getSourceImage();
+          const bgW = bgTexture.width;
+          const bgH = bgTexture.height;
+          const scaleX = width / bgW;
+          const scaleY = height / bgH;
+          const bgScale = Math.max(scaleX, scaleY);
+          this.background.setScale(bgScale);
+          const newBgW = bgW * bgScale;
+          const newBgH = bgH * bgScale;
+          if (newBgW > width) this.background.x = -(newBgW - width) / 2;
+          if (newBgH > height) this.background.y = -(newBgH - height) / 2;
+
+          // 2) PLAYER SETUP (grid-based position)
+          const balloonDisplayHeight = 100;
+          const balloonImg = this.textures.get("player").getSourceImage();
+          const balloonScale = balloonDisplayHeight / balloonImg.height;
+          this.playerY = height - balloonDisplayHeight / 2 - 20;
+          this.player = this.physics.add
+            .sprite(width / 2, this.playerY, "player")
+            .setOrigin(0.5)
+            .setScale(balloonScale)
+            .setCollideWorldBounds(true);
+          this.player.setVelocity(0); // Start stationary
+
+          // 3) ROBOT SETUP (now moves on grid after player turn)
+          const robotImg = this.textures.get("robot").getSourceImage();
+          const robotScale = this.robotDisplaySize / Math.max(robotImg.width, robotImg.height);
+          this.robot = this.physics.add
+            .sprite(width / 2, 150, "robot")
+            .setOrigin(0.5)
+            .setScale(robotScale)
+            .setCollideWorldBounds(true);
+
+          // 4) GROUPS FOR ITEMS & BOMBS
+          this.items = this.physics.add.group();
+          this.bombs = this.physics.add.group();
+
+          // 5) SCORE UI
+          this.score = 0;
+          this.scoreText = this.add
+            .text(10, 10, `Score: ${this.score}`, {
+              fontSize: "24px",
+              fill: "#ffffff",
+              fontFamily: "Arial, sans-serif",
+            })
+            .setDepth(5);
+
+          // 6) INPUT & FARCADE SETUP (now turn-based input)
+          this.cursors = this.input.keyboard.createCursorKeys();
+
+          // Keyboard controls trigger movement once per key press
+          this.input.keyboard.on("keydown-LEFT", this.moveLeft, this);
+          this.input.keyboard.on("keydown-RIGHT", this.moveRight, this);
+          this.input.keyboard.on("keydown-A", this.moveLeft, this);
+          this.input.keyboard.on("keydown-D", this.moveRight, this);
+
+          // Tap or swipe controls
+          this.input.on(
+            "pointerdown",
+            (p) => {
+              this.touchStartX = p.x;
+              this.touchStartTime = this.time.now;
+            },
+            this,
+          );
+
+          this.input.on(
+            "pointerup",
+            (p) => {
+              if (this.gameOverActive) return;
+              const deltaX = p.x - this.touchStartX;
+              const deltaTime = this.time.now - this.touchStartTime;
+              if (Math.abs(deltaX) > 30 && deltaTime < 250) {
+                if (deltaX > 0) {
+                  this.moveRight();
+                } else {
+                  this.moveLeft();
+                }
+              } else {
+                if (p.x < this.sys.game.config.width / 2) {
+                  this.moveLeft();
+                } else {
+                  this.moveRight();
+                }
+              }
+            },
+            this,
+          );
+
+          window.FarcadeSDK.on("play_again", () => {
+            if (this.gameOverActive) {
+              this.scene.restart();
+            }
+          });
+          window.FarcadeSDK.on("toggle_mute", (data) => console.log("Mute toggled:", data.isMuted));
+
+          // 7) COLLISION HANDLERS
+          this.physics.add.overlap(this.player, this.items, this.collectItem, null, this);
+          this.physics.add.overlap(this.player, this.bombs, this.hitBomb, null, this);
+
+          // 8) ITEM DROPPING TIMER (triggered per turn)
+          this._dropOnce(); // Initial drop - ensure it's called correctly
+        }
+
+        update() {
+          if (this.gameOverActive) return;
+
+          // Clamp player position
+          this.player.x = Phaser.Math.Clamp(
+            this.player.x,
+            this.player.displayWidth / 2,
+            this.sys.game.config.width - this.player.displayWidth / 2,
+          );
+          this.player.y = this.playerY; // Keep Y fixed
+        }
+
+        endPlayerTurn() {
+          // After player moves, update robot and drop items
+          this.robot.x += 50; // Simple robot movement
+          if (this.robot.x >= this.sys.game.config.width - this.robot.displayWidth / 2) {
+            this.robot.x = this.robot.displayWidth / 2; // Reset position
+          }
+          this._dropOnce(); // Drop new item or bomb
+        }
+
+        moveLeft() {
+          this.player.x -= this.gridSize;
+          this.endPlayerTurn();
+        }
+
+        moveRight() {
+          this.player.x += this.gridSize;
+          this.endPlayerTurn();
+        }
+
+        _dropOnce() {
+          const isBomb = Phaser.Math.Between(1, 10) === 1; // 10% chance
+          const key = isBomb ? "bomb" : "item";
+          const sprite = this.physics.add
+            .sprite(this.robot.x, this.robot.y + 50, key)
+            .setDisplaySize(this.robotDisplaySize / 4, this.robotDisplaySize / 4);
+
+          if (isBomb) {
+            this.bombs.add(sprite);
+            sprite.setTint(0xff0000);
+          } else {
+            this.items.add(sprite);
+            sprite.setTint(0x00ff00);
+          }
+          sprite.setVelocityY(200); // Still falls, but game is turn-based
+        }
+
+        collectItem(player, item) {
+          item.destroy();
+          this.score += 10;
+          this.scoreText.setText(`Score: ${this.score}`);
+          window.FarcadeSDK.singlePlayer.actions.hapticFeedback();
+        }
+
+        hitBomb(player, bomb) {
+          bomb.destroy();
+          window.FarcadeSDK.singlePlayer.actions.hapticFeedback();
+          window.FarcadeSDK.singlePlayer.actions.gameOver({ score: this.score });
+          this.gameOverActive = true;
+          this.physics.pause();
+        }
+      }
+
+      //
+      // ─── GAME CONFIGURATION ─────────────────────────────────────────────────────
+      //
+      const config = {
+        type: Phaser.AUTO,
+        width: 540,
+        height: 960,
+        parent: "game-container",
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        physics: { default: "arcade", arcade: { gravity: { y: 0 }, debug: false } },
+        scene: [StartScene, MainScene],
+      };
+
+      new Phaser.Game(config);
+    </script>
+  </body>
+</html>
